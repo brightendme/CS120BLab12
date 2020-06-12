@@ -13,79 +13,124 @@
 #include "timer.h"
 #include "scheduler.h"
 #include "keypad.h"
+#include "io.c"
 #endif
+unsigned short index_count = 1;
+//enum STATES { KPstate };
 
-enum STATES { KPstate };
+//unsigned char keypad_input;
+/*int KPTick(int state){
+	switch(state){
+	case KPstate:
+		keypad_input = GetKeypadKey();
+	break;
+	}
+}
+enum
+*/
+unsigned short userLoc;
+enum userStates{start, up, down} userStates;
+int userTick(int state){
+	unsigned char userIn;
+	userIn = GetKeypadKey();
+	switch(state){
+		case start:
+		state = up;
+		LCD_Cursor(1);
+		LCD_WriteData('*');
+		userLoc = 1;
+		break;
+		case up:
+		if(userIn == '2'){
+			LCD_Cursor(1);
+			LCD_WriteData(' ');
+			LCD_Cursor(17);
+			LCD_WriteData('*');
+			userLoc = 17;
+			state = down;
+		}
+		else{
+			state = up;
+			LCD_Cursor(1);
+			LCD_WriteData('*');
+			userLoc = 1;
+			//LCD_Cursor(1);
+			//LCD_WriteData(' ');
 
-unsigned char KPout = 0x00;
-
-int tick(int state) {
-  unsigned char keypad_input;
-  keypad_input = GetKeypadKey();
-  switch(state) {
-    case KPstate:
-    switch(keypad_input) {
-      			case '\0':
-      			KPout = 0x1F;
-      			break;
-      			case '1':
-      			KPout = 0x01;
-      			break;
-      			case '2':
-      			KPout = 0x02;
-      			break;
-      			case '3':
-      			KPout = 0x03;
-      			break;
-      			case '4':
-      			KPout = 0x04;
-      			break;
-      			case '5':
-      			KPout = 0x05;
-      			break;
-      			case '6':
-      			KPout = 0x06;
-      			break;
-      			case '7':
-      			KPout = 0x07;
-      			break;
-      			case '8':
-      			KPout = 0x08;
-      			break;
-      			case '9':
-      			KPout = 0x09;
-      			break;
-      			case 'A':
-      			KPout = 0x0A;
-      			break;
-      			case 'B':
-      			KPout = 0x0B;
-      			break;
-      			case 'C':
-      			KPout = 0x0C;
-      			break;
-      			case 'D':
-      			KPout = 0x0D;
-      			break;
-      			case '*':
-      			KPout = 0x0E;
-      			break;
-      			case '0':
-      			KPout = 0x00;
-      			break;
-      			case '#':
-      			KPout = 0x0F;
-      			break;
-      			default:
-      			KPout = 0xFF;
-      			break;
-    }
-    state = KPstate;
-    PORTA = KPout;
-    break;
-  }
+		}
+		break;
+		case down:
+		if(userIn == '5'){
+			LCD_Cursor(17);
+			LCD_WriteData(' ');
+			LCD_Cursor(1);
+			LCD_WriteData('*');
+			userLoc = 1;
+			state = up;
+		}
+		else{
+			state = down;
+			LCD_Cursor(17);
+			LCD_WriteData('*');
+			userLoc = 17;
+		}
+		break;
+		default:
+		state = up;
+		break;
+	}
+	return state;
+}
+enum enemyState{create}enemyState;
+unsigned short topLoc = 0;
+unsigned short botLoc = 16;
+unsigned char botOK = 0x00;
+unsigned char topOK = 0x00;
+int enemyTick(int state) {
+	switch(state){
+		case create:
+			if(topLoc == 0  && botLoc == 16){
+				topLoc = 16;
+				topOK = 0x01;
+			}
+			if(topLoc == 13){
+				botLoc = 32;
+				botOK = 0x01;
+			}
+			if(topOK == 0x01){
+				if(topLoc <=15){
+				LCD_Cursor(topLoc + 1);
+				LCD_WriteData(' ');
+				}
+				LCD_Cursor(topLoc);
+				LCD_WriteData('#');
+				topLoc --;
+			}
+			if(topLoc < 1 && topOK == 0x01){
+				topOK = 0x00;
+				LCD_Cursor(1);
+				LCD_WriteData(' ');
+			}
+			if(botOK == 0x01){
+				if(botLoc <= 31){
+				LCD_Cursor(botLoc+1);
+				LCD_WriteData(' ');
+				}
+				LCD_Cursor(botLoc);
+				LCD_WriteData('#');
+				botLoc--;
+			}
+			if(botLoc < 17 && botOK == 0x01){
+				botOK = 0x00;
+				LCD_Cursor(17);
+				LCD_WriteData(' ');
+			}
+			break;
+	}
+	state = create;
   return state;
 }
+
 int main(void) {
     /* Insert DDR and PORT initializations */
      DDRA = 0xFF; PORTA = 0x00;
@@ -94,19 +139,26 @@ int main(void) {
     DDRD = 0xFF; PORTD = 0x00;
 
     // unsigned long int
-    static task task1;
-    task *tasks[] = { &task1};
+    static task task1, task2;
+    task *tasks[] = { &task1, &task2};
     const unsigned short numTasks = sizeof(tasks)/sizeof(task*);
 
 	   // Task 1
 	   task1.state = 0;//Task initial state.
-	   task1.period = 2;//Task Period.
-	   task1.elapsedTime = 2;//Task current elapsed time.
-           task1.TickFct = &tick;//Function pointer for the tick.
+	   task1.period = 5;//Task Period.
+	   task1.elapsedTime = 5;//Task current elapsed time.
+           task1.TickFct = &userTick;//Function pointer for the tick.
+	   
+	   task2.state = 0;
+	   task2.period = 100;
+	   task2.elapsedTime = 100;
+	   task2.TickFct = &enemyTick;
 
 	   TimerSet(10);
 	   TimerOn();
-
+	   LCD_init();
+	   LCD_ClearScreen();
+	  // LCD_DisplayString(1,"Congratulations!");
      unsigned short i; // Scheduler for-loop iterator
    	while(1) {
    		for ( i = 0; i < numTasks; i++ ) {
